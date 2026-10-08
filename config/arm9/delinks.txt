@@ -162,3 +162,7 @@ src/game/Scroll2.c:
 src/game/Scroll3.c:
     complete
     .text       start:0x0201d638 end:0x0201f004
+
+src/game/Camera.c:
+    complete
+    .text       start:0x0201f004 end:0x0201ff6c
