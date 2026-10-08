@@ -1,0 +1,15 @@
+diff --git a/cli/src/cmd/lcf.rs b/cli/src/cmd/lcf.rs
+index c27c4be..4fb3a29 100644
+--- a/cli/src/cmd/lcf.rs
++++ b/cli/src/cmd/lcf.rs
+@@ -230,6 +230,10 @@ impl Lcf {
+                 // Migrated files will have the same name as the original, that is intentional
+                 continue;
+             }
++            if file.gap() {
++                // Gap files share a base name and are told apart by their gap ID
++                continue;
++            }
+             let filename = file.name.rsplit_once(['/', '\\']).unwrap_or(("", &file.name)).1;
+             match delink_files.entry(filename.to_string()) {
+                 hash_map::Entry::Occupied(occupied_entry) => {
