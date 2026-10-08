@@ -35,6 +35,7 @@ void *func_02005cd0(s32 v);
 void func_020044a0(void *obj);
 void func_0201ac94(void *obj, s32 v);
 void func_02003b98(void *obj, s32 x, s32 y);
+void func_02003c74(void *actor, s32 x, s32 y);   /* place at an fx32 position */
 void func_02003890(void *obj, s32 *pos);
 s32 func_0201a0a0(s32 *xz, void *obj);
 void func_02028678(s32 value, char *buf);
