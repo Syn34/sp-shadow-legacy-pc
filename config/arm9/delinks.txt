@@ -178,3 +178,11 @@ src/game/SoundDS1.c:
 src/game/SoundDS2.c:
     complete
     .text       start:0x02021b50 end:0x02022ecc
+
+src/game/SeqPlayer1.c:
+    complete
+    .text       start:0x02022ecc end:0x020241b8
+
+src/game/SeqPlayer2.c:
+    complete
+    .text       start:0x020241b8 end:0x02026758
