@@ -71,6 +71,9 @@ from build import CFLAGS  # noqa: E402  (same flags as the real build)
 MAIN, MAIN_SIZE = 0x02000000, 0x400000
 ITCM, ITCM_SIZE = 0x01FF8000, 0x8000
 DTCM, DTCM_SIZE = 0x027C0000, 0x4000
+# the last 4 KiB of main RAM (system area: 0x027ffc00...) as the SDK reads it,
+# through the 0x027xxxxx mirror; a copy, so writes do not reach the original
+SYSAREA, SYSAREA_SIZE = 0x027FF000, 0x1000
 EXTRA = [(0x04000000, 0x200000), (0x05000000, 0x1000), (0x06000000, 0x1000000), (0x07000000, 0x1000)]
 SCRATCH, SCRATCH_SIZE = 0x0B000000, 0x100000      # argument buffers
 VRAM_BUF = 0x06000000                              # `vram:` argument buffers (64 KiB)
@@ -179,13 +182,14 @@ class Machine:
     def __init__(self, snapshot, cand_code):
         self.uc = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         self.uc.ctl_set_cpu_model(UC_CPU_ARM_926)  # ARMv5TE, like the DS's ARM946E-S
-        self.regions = [(MAIN, MAIN_SIZE), (ITCM, ITCM_SIZE), (DTCM, DTCM_SIZE), *EXTRA,
+        self.regions = [(MAIN, MAIN_SIZE), (ITCM, ITCM_SIZE), (DTCM, DTCM_SIZE), (SYSAREA, SYSAREA_SIZE), *EXTRA,
                         (SCRATCH, SCRATCH_SIZE), (CAND, CAND_SIZE), (STACK, STACK_SIZE), (MAGIC_LR, 0x1000)]
         for base, size in self.regions:
             self.uc.mem_map(base, size)
         self.uc.mem_write(MAIN, snapshot[0:MAIN_SIZE])
         self.uc.mem_write(ITCM, snapshot[MAIN_SIZE:MAIN_SIZE + ITCM_SIZE])
         self.uc.mem_write(DTCM, snapshot[MAIN_SIZE + ITCM_SIZE:MAIN_SIZE + ITCM_SIZE + DTCM_SIZE])
+        self.uc.mem_write(SYSAREA, snapshot[MAIN_SIZE - SYSAREA_SIZE:MAIN_SIZE])
         self.uc.mem_write(CAND, cand_code)
         self.snapshot = snapshot
         self.cand_code = cand_code
@@ -221,6 +225,8 @@ class Machine:
         if DTCM <= page_addr < DTCM + DTCM_SIZE:
             o = MAIN_SIZE + ITCM_SIZE + page_addr - DTCM
             return self.snapshot[o:o + n]
+        if SYSAREA <= page_addr < SYSAREA + SYSAREA_SIZE:
+            return self.snapshot[MAIN_SIZE - SYSAREA_SIZE:MAIN_SIZE]
         if CAND <= page_addr < CAND + CAND_SIZE:
             o = page_addr - CAND
             return (self.cand_code[o:o + n] + bytes(n))[:n]
