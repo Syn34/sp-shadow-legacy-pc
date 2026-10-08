@@ -29,7 +29,7 @@ void func_0200fdb4(const u8 *src, void *dst);
 u32 func_0200feec(const u8 *src);
 void func_020129ac(s32 id);
 u32 func_0201d4a0(u32 tile, u32 pal, u32 a, u32 layer);
-void func_0201de40(u32 tile, u32 pal, u32 layer);
+u32 func_0201de40(u32 tile, u32 bank, u32 layer);
 
 /* this file's own functions, called before their definition */
 u16 *func_0201baa8(u32 x, u32 y, u32 layer);
