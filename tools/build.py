@@ -68,6 +68,9 @@ CFLAGS = [
     # caller's outgoing argument area, which the original (MWCC) callers may
     # still rely on after the call
     "-fno-optimize-sibling-calls",
+    # no switch-to-lookup-table conversion: only the C objects' .text is linked
+    # (the game's own data stays where it is), so C code must not need .rodata
+    "-fno-tree-switch-conversion",
     "-Wall", "-Wextra", "-Wno-unused-parameter", "-Werror=implicit-function-declaration",
     "-Iinclude",
 ]
