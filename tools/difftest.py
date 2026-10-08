@@ -33,7 +33,7 @@ Argument generators, one per parameter (r0-r3, then the stack):
     ram:ADDR                  fixed address (e.g. a game object)
 Memory setup (applied to the starting state of both runs):
     $NAME=GEN                 bind NAME to a generated value or buffer (ptr:, zero:, u32 ...)
-    @TARGET:W=VALUE           write VALUE (literal, $NAME or generator) as W-bit (8/16/32)
+    @TARGET:W=VALUE           write VALUE (literal, $NAME[+OFFSET] or generator) as W-bit (8/16/32)
                               to TARGET (hex address or $NAME+OFFSET)
   e.g. `$R=ptr:16:4 $O=ptr:0x400:4 @020e36a4:8=1 @020e36c8:32=$R @$R+8:32=$O`
 Options after the arguments: `cases=N` per snapshot (default 300).
@@ -390,7 +390,8 @@ class ArgGen:
     def value(self, s):
         rng = self.rng
         if s.startswith("$"):
-            return self.names[s[1:]]
+            name, _, off = s[1:].partition("+")
+            return (self.names[name] + (int(off, 0) if off else 0)) & 0xFFFFFFFF
         if re.fullmatch(r"-?(0x[0-9a-fA-F]+|\d+)", s):
             return int(s, 0) & 0xFFFFFFFF
         kind, *p = s.split(":")

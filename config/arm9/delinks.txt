@@ -194,3 +194,15 @@ src/game/Song1.c:
 src/game/Song2.c:
     complete
     .text       start:0x0202752c end:0x02028a50
+
+src/game/Text1.c:
+    complete
+    .text       start:0x02028a50 end:0x02029364
+
+src/game/Text2.c:
+    complete
+    .text       start:0x02029364 end:0x020298d8
+
+src/game/GameRoot0.c:
+    complete
+    .text       start:0x020298d8 end:0x0202a5d0
