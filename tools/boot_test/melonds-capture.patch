@@ -1,0 +1,51 @@
+diff --git a/src/ARM.cpp b/src/ARM.cpp
+index 3937a99..30c967c 100644
+--- a/src/ARM.cpp
++++ b/src/ARM.cpp
+@@ -669,6 +669,13 @@ void ARMv5::Execute()
+                 if (R[15] & 0x2) { NextInstr[1] >>= 16; CodeCycles = 0; }
+                 else             NextInstr[1] = CodeRead32(R[15], false);
+ 
++                if (CaptureMap)
++                {
++                    u32 a = R[15] - 4;
++                    if (a - CaptureBase < CaptureSize && CaptureMap[(a - CaptureBase) >> 1])
++                        CaptureCallback(this, a, CaptureUser);
++                }
++
+                 // actually execute
+                 u32 icode = (CurInstr >> 6) & 0x3FF;
+                 ARMInterpreter::THUMBInstrTable[icode](this);
+@@ -684,6 +691,13 @@ void ARMv5::Execute()
+                 NextInstr[0] = NextInstr[1];
+                 NextInstr[1] = CodeRead32(R[15], false);
+ 
++                if (CaptureMap)
++                {
++                    u32 a = R[15] - 8;
++                    if (a - CaptureBase < CaptureSize && CaptureMap[(a - CaptureBase) >> 1])
++                        CaptureCallback(this, a, CaptureUser);
++                }
++
+                 // actually execute
+                 if (CheckCondition(CurInstr >> 28))
+                 {
+diff --git a/src/ARM.h b/src/ARM.h
+index 88f970b..dfe8e38 100644
+--- a/src/ARM.h
++++ b/src/ARM.h
+@@ -232,6 +232,14 @@ protected:
+ class ARMv5 : public ARM
+ {
+ public:
++    // Call capture hook (interpreter only): when the instruction about to run is
++    // flagged in CaptureMap (one byte per halfword from CaptureBase), call
++    // CaptureCallback before executing it. Used by decompilation test tools.
++    u8* CaptureMap = nullptr;
++    u32 CaptureBase = 0, CaptureSize = 0;
++    void (*CaptureCallback)(ARMv5* cpu, u32 addr, void* user) = nullptr;
++    void* CaptureUser = nullptr;
++
+     ARMv5(melonDS::NDS& nds, std::optional<GDBArgs> gdb, bool jit);
+     ~ARMv5();
+ 

@@ -28,6 +28,7 @@ Argument generators, one per parameter (r0-r3, then the stack):
     vram:SIZE[:ALIGN]         same, but the buffer lives in VRAM; 8-bit writes to
                               VRAM are counted and must match (the DS drops them)
     zero:SIZE                 pointer to a SIZE-byte buffer of zeros (e.g. an empty container)
+    bytes:N:Z                 pointer to N random bytes followed by Z zero bytes (bounded streams)
     fifo                      pointer to a single word (a hardware FIFO register)
     ram:ADDR                  fixed address (e.g. a game object)
 Memory setup (applied to the starting state of both runs):
@@ -38,7 +39,12 @@ Memory setup (applied to the starting state of both runs):
 Options after the arguments: `cases=N` per snapshot (default 300).
 A function may carry several @difftest lines (e.g. RAM and VRAM pointers).
 
-Usage: difftest.py [function-name ...] [--snapshot ram.bin ...] [--cases N]
+Usage: difftest.py [function-name | src/file.c ...] [--snapshot ram.bin ...] [--cases N]
+                   [--replay-only | --no-replay]
+
+Every function defined in src/ that was called during the boot script (and has
+recordings in build/captures/, see tools/capture.py) is also replayed with the
+exact CPU and memory state of those real calls.
 """
 import argparse
 import glob
@@ -49,6 +55,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 
 from unicorn import Uc, UcError, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_MEM_UNMAPPED, UC_HOOK_INTR, UC_HOOK_MEM_WRITE
 from unicorn.arm_const import (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3, UC_ARM_REG_R4,
@@ -64,7 +71,7 @@ from build import CFLAGS  # noqa: E402  (same flags as the real build)
 MAIN, MAIN_SIZE = 0x02000000, 0x400000
 ITCM, ITCM_SIZE = 0x01FF8000, 0x8000
 DTCM, DTCM_SIZE = 0x027C0000, 0x4000
-EXTRA = [(0x04000000, 0x100000), (0x05000000, 0x1000), (0x06000000, 0x1000000), (0x07000000, 0x1000)]
+EXTRA = [(0x04000000, 0x200000), (0x05000000, 0x1000), (0x06000000, 0x1000000), (0x07000000, 0x1000)]
 SCRATCH, SCRATCH_SIZE = 0x0B000000, 0x100000      # argument buffers
 VRAM_BUF = 0x06000000                              # `vram:` argument buffers (64 KiB)
 CAND, CAND_SIZE = 0x0C000000, 0x100000            # candidate code
@@ -105,6 +112,21 @@ def find_tests(names):
                 opts["_label"] = " ".join(x for x in spec if "=" not in x or x.startswith(("$", "@")))
                 tests.append((func, path, args, opts))
     return tests
+
+
+DEF_RE = re.compile(r"^(?!static\b)(?:[A-Za-z_][\w \*]*?[\s\*])(\w+)\s*\(([^;{}]*)\)\s*\{", re.M)
+
+
+def find_definitions(path):
+    """All non-static function definitions in a source file -> number of return regs."""
+    out = {}
+    for m in DEF_RE.finditer(open(path).read()):
+        head = m.group(0)
+        rtype = head[:head.index(m.group(1))].strip()
+        if rtype in ("return", "else", "if", "while", "for", "switch"):
+            continue
+        out[m.group(1)] = 0 if rtype == "void" else 2 if re.search(r"\b(u64|s64|long long)\b", rtype) else 1
+    return out
 
 
 # ---------------------------------------------------------------- symbols
@@ -205,6 +227,18 @@ class Machine:
             return self.vbuffers[o:o + n]
         return bytes(n)
 
+    def mapped(self, addr):
+        return any(base <= addr < base + size for base, size in self.regions)
+
+    def masked_pristine(self, page, ign):
+        data = self.pristine(page)
+        if ign and page < ign[1] and page + self.PAGE > ign[0]:
+            b = bytearray(data)
+            a, z = max(ign[0], page) - page, min(ign[1], page + self.PAGE) - page
+            b[a:z] = bytes(z - a)
+            data = bytes(b)
+        return data
+
     def _write(self, uc, access, addr, size, value, data):
         if size == 1 and 0x05000000 <= addr < 0x08000000:
             # the DS ignores 8-bit writes to palette RAM, VRAM and OAM
@@ -221,11 +255,14 @@ class Machine:
         self.fault = f"exception/swi {intno}"
         uc.emu_stop()
 
-    def call(self, addr, thumb, args, buffers, patches=()):
+    def call(self, addr, thumb, args, buffers, patches=(), regs=None):
+        """Run one function. `regs` (r0-r15 from a recorded call) replaces the
+        generated arguments and the scratch stack with the recorded state."""
         uc = self.uc
         # restore whatever the previous call touched, then install this case's buffers
         for page in self.dirty:
-            uc.mem_write(page, self.pristine(page))
+            if self.mapped(page):
+                uc.mem_write(page, self.pristine(page))
         self.dirty = set()
         self.buffers = buffers
         self.vbuffers = buffers[0x10000:0x20000]
@@ -249,6 +286,14 @@ class Machine:
         for i, r in enumerate(SAVED[:-1]):
             uc.reg_write(r, 0x5A5A0000 + i)
         uc.reg_write(UC_ARM_REG_R12, 0x12121212)
+        self.ignore = None
+        if regs is not None:
+            for i, r in enumerate(REGS + SAVED[:-1] + [UC_ARM_REG_R12]):
+                uc.reg_write(r, regs[i])
+            sp = regs[13]
+            # the callee's own stack frame (below the entry sp) is dead after the
+            # return and laid out differently by different compilers: ignore it
+            self.ignore = (sp - 0x4000, sp)
         uc.reg_write(UC_ARM_REG_SP, sp)
         uc.reg_write(UC_ARM_REG_LR, MAGIC_LR)
         uc.reg_write(UC_ARM_REG_CPSR, 0x1F)  # system mode, ARM state
@@ -263,8 +308,17 @@ class Machine:
         regs = [uc.reg_read(r) for r in (UC_ARM_REG_R0, UC_ARM_REG_R1)] + [uc.reg_read(r) for r in SAVED]
         # memory: every touched page, plus the argument buffers
         mem = {page: bytes(uc.mem_read(page, self.PAGE)) for page in self.dirty
-               if not (STACK <= page < STACK + STACK_SIZE)}
+               if not (STACK <= page < STACK + STACK_SIZE) and self.mapped(page)}
         mem[SCRATCH] = bytes(uc.mem_read(SCRATCH, 0x10000))
+        if self.ignore:
+            lo, hi = self.ignore
+            for page in list(mem):
+                if isinstance(page, int) and page < hi and page + self.PAGE > lo:
+                    b = bytearray(mem[page])
+                    a, z = max(lo, page) - page, min(hi, page + self.PAGE) - page
+                    b[a:z] = bytes(z - a)
+                    mem[page] = bytes(b)
+        mem["ignore"] = self.ignore
         mem["vram_byte_writes"] = self.vram_byte_writes
         return self.fault, regs, mem
 
@@ -273,9 +327,10 @@ class Machine:
         if m1["vram_byte_writes"] != m2["vram_byte_writes"]:
             return (f"8-bit writes to VRAM/palette/OAM (ignored by DS hardware): "
                     f"{m1['vram_byte_writes']} (original) vs {m2['vram_byte_writes']} (C)")
-        for page in (set(m1) | set(m2)) - {"vram_byte_writes"}:
-            a = m1.get(page) or self.pristine(page)
-            b = m2.get(page) or self.pristine(page)
+        ign = m1.get("ignore")
+        for page in (set(m1) | set(m2)) - {"vram_byte_writes", "ignore"}:
+            a = m1.get(page) or self.masked_pristine(page, ign)
+            b = m2.get(page) or self.masked_pristine(page, ign)
             if a != b:
                 off = next(j for j in range(min(len(a), len(b))) if a[j] != b[j])
                 return f"memory differs at {page + off:#x}: {a[off]:#04x} (original) vs {b[off]:#04x} (C)"
@@ -320,6 +375,14 @@ class ArgGen:
                 off = addr - SCRATCH
                 self.buffers[off:off + size] = bytes(size)
             self.cursor = addr + size + 8
+            return addr
+        if kind == "bytes":
+            n, z = int(p[0], 0), int(p[1], 0)
+            self.cursor = (self.cursor + 0x40 + 3) & ~3
+            addr = self.cursor + rng.randrange(0, 4)
+            off = addr - SCRATCH
+            self.buffers[off + n:off + n + z] = bytes(z)
+            self.cursor = addr + n + z + 8
             return addr
         if kind == "vram":
             size = int(p[0], 0)
@@ -391,6 +454,41 @@ def run_test(machine, func, spec, opts, syms, modes, cand_syms, n, seed):
     return True, n, None, None, faults
 
 
+def load_capture(path):
+    raw = zlib.decompress(open(path, "rb").read())
+    if raw[:4] != b"CAP1":
+        raise ValueError(f"{path}: not a capture")
+    addr, frame = struct.unpack_from("<II", raw, 4)
+    regs = list(struct.unpack_from("<16I", raw, 12))
+    cpsr = struct.unpack_from("<I", raw, 76)[0]
+    return addr, frame, regs, cpsr, raw[80:]
+
+
+def run_replays(func, cand_code, cand_syms, syms, cap_dir, ret):
+    """Replay every recorded call of `func`. Returns (ok, n, message)."""
+    files = sorted(glob.glob(os.path.join(cap_dir, func, "*.bin.z")),
+                   key=lambda p: int(os.path.basename(p).split(".")[0]))
+    names = ["r0", "r1", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "sp"]
+    for path in files:
+        addr, frame, regs, cpsr, mem = load_capture(path)
+        machine = Machine(mem, cand_code)
+        f1, r1, m1 = machine.call(addr, bool(cpsr & 0x20), [], bytes(SCRATCH_SIZE), regs=regs)
+        f2, r2, m2 = machine.call(cand_syms[func], False, [], bytes(SCRATCH_SIZE), regs=regs)
+        tag = f"call recorded at frame {frame} ({os.path.basename(path)})"
+        if (f1 is None) != (f2 is None):
+            return False, len(files), f"{tag}: original: {f1 or 'ok'} / C: {f2 or 'ok'}"
+        if f1:
+            continue
+        check = list(range(ret)) + list(range(2, len(r1)))
+        if any(r1[k] != r2[k] for k in check):
+            d = [f"{names[k]} {r1[k]:#x} vs {r2[k]:#x}" for k in check if r1[k] != r2[k]]
+            return False, len(files), f"{tag}: registers differ: " + ", ".join(d)
+        why = machine.same_memory(m1, m2)
+        if why:
+            return False, len(files), f"{tag}: {why}"
+    return True, len(files), None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("names", nargs="*")
@@ -398,7 +496,10 @@ def main():
                     help="memory snapshot(s) to start from (default: build/ram_snapshot*.bin)")
     ap.add_argument("--cases", type=int, default=None, help="cases per test and snapshot")
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--no-replay", action="store_true", help="skip recorded-call replays")
+    ap.add_argument("--replay-only", action="store_true", help="only run recorded-call replays")
     a = ap.parse_args()
+    cap_dir = os.path.join(ROOT, "build", "captures")
 
     snap_paths = a.snapshot or sorted(glob.glob(os.path.join(ROOT, "build", "ram_snapshot*.bin")))
     if not snap_paths:
@@ -406,20 +507,52 @@ def main():
     if not os.path.exists(os.path.join(ROOT, "build/arm9_matching.elf")):
         sys.exit("run `python3 tools/build.py` first (needs build/arm9_matching.elf)")
 
-    tests = find_tests(set(a.names))
-    if not tests:
-        sys.exit("no @difftest annotations found" + (f" for {a.names}" if a.names else ""))
+    names = set(a.names)
+    files = []
+    for n in list(names):
+        if n.endswith(".c"):
+            files.append(os.path.abspath(n))
+            names.discard(n)
+    tests = find_tests(names)
     syms, modes = original_symbols()
 
     by_file = {}
-    for t in tests:
-        by_file.setdefault(t[1], []).append(t)
+    for path in sorted(glob.glob(os.path.join(ROOT, "src", "**", "*.c"), recursive=True)):
+        if files and os.path.abspath(path) not in files:
+            continue
+        defs = find_definitions(path)
+        if names and not (names & set(defs)):
+            continue
+        by_file[path] = [t for t in tests if t[1] == path]
     failures = 0
+    replay_total = [0]
+    untested = []
     with tempfile.TemporaryDirectory() as tmp:
         for path, ftests in by_file.items():
             cand_code, cand_syms = build_candidate(path, syms, tmp)
-            machines = [Machine(open(sp, "rb").read(), cand_code) for sp in snap_paths]
+            machines = [] if a.replay_only else [Machine(open(sp, "rb").read(), cand_code) for sp in snap_paths]
+            if not a.no_replay:
+                rets = find_definitions(path)
+                if names:
+                    rets = {k: v for k, v in rets.items() if k in names}
+                for func in rets:
+                    if func in cand_syms and os.path.isdir(os.path.join(cap_dir, func)):
+                        ok, n, why = run_replays(func, cand_code, cand_syms, syms, cap_dir, rets[func])
+                        replay_total[0] += 1
+                        if ok:
+                            print(f"PASS {func} [replay]: {n} recorded game calls identical")
+                        else:
+                            failures += 1
+                            print(f"FAIL {func} [replay]: {why}")
+            covered = {t[0] for t in ftests}
+            if not a.no_replay:
+                covered |= {f for f in find_definitions(path) if os.path.isdir(os.path.join(cap_dir, f))}
+            untested += [f for f in find_definitions(path) if f not in covered and (not names or f in names)]
+            if a.replay_only:
+                continue
             for func, _, spec, opts in ftests:
+                if files and os.path.abspath(path) not in files:
+                    continue
                 if func not in syms or func not in cand_syms:
                     print(f"SKIP {func}: not found in original symbols or candidate")
                     failures += 1
@@ -442,8 +575,13 @@ def main():
                     note = f", {faults} faulted identically in both" if faults else ""
                     print(f"PASS {func} [{opts['_label']}]: {total} cases identical "
                           f"over {len(snap_paths)} snapshot(s){note}")
-    nfunc = len({t[0] for t in tests})
-    print(f"\n{len(tests) - failures}/{len(tests)} test configurations passed ({nfunc} functions)")
+    ran = [t for f in by_file.values() for t in f]
+    nfunc = len({t[0] for t in ran}) 
+    total = (0 if a.replay_only else len(ran)) + replay_total[0]
+    if untested and not a.replay_only and not a.no_replay:
+        print(f"\nNOT TESTED ({len(untested)}): " + ", ".join(untested))
+    print(f"\n{total - failures}/{total} tests passed ({nfunc} functions with generated-input tests, "
+          f"{replay_total[0]} with recorded game calls)")
     sys.exit(1 if failures else 0)
 
 

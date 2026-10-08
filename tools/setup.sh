@@ -11,7 +11,7 @@ if [[ "${SKIP_APT:-0}" != 1 ]] && command -v apt-get >/dev/null; then
     echo "== installing packages (sudo)"
     sudo apt-get update -q
     sudo apt-get install -y -q binutils-arm-none-eabi gcc-arm-none-eabi cmake ninja-build \
-        g++ git python3 python3-pip python3-pil curl
+        g++ git python3 python3-pip python3-pil curl zlib1g-dev
 fi
 
 echo "== python packages"
@@ -40,6 +40,7 @@ if [[ ! -x tools/bin/boot_test ]]; then
     if [[ ! -d tools/_deps/melonDS ]]; then
         git clone -q https://github.com/melonDS-emu/melonDS.git tools/_deps/melonDS
         git -C tools/_deps/melonDS checkout -q "$MELONDS_COMMIT"
+        git -C tools/_deps/melonDS apply "$PWD/tools/boot_test/melonds-capture.patch"
     fi
     cmake -S tools/boot_test -B tools/_deps/boot_test-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DMELONDS_DIR="$PWD/tools/_deps/melonDS" >/dev/null

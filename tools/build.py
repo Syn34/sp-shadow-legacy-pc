@@ -52,7 +52,10 @@ LD = CROSS + "ld"
 OBJCOPY = CROSS + "objcopy"
 
 CFLAGS = [
-    "-mcpu=arm946e-s", "-marm", "-mthumb-interwork", "-mfloat-abi=soft",
+    # ARMv5T rather than the CPU's real ARMv5TE: v5T has no LDRD/STRD, which need
+    # 8-byte alignment on the ARM946E-S while the game's (ATPCS) code only keeps
+    # 4-byte alignment for stack and data. Long multiplies are still available.
+    "-march=armv5t", "-mtune=arm946e-s", "-marm", "-mthumb-interwork", "-mfloat-abi=soft",
     "-O2", "-std=gnu11", "-ffreestanding", "-fno-builtin", "-nostdlib",
     "-fno-common", "-fno-strict-aliasing", "-fshort-wchar",
     "-fno-unwind-tables", "-fno-asynchronous-unwind-tables",

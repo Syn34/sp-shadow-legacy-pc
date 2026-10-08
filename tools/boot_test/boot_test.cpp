@@ -9,6 +9,7 @@
 //   boot_test <rom.nds> <outdir> [--frames N] [--script inputs.txt]
 //             [--shot F1,F2,...] [--shot-every N] [--no-jit]
 //             [--dump-ram F1,F2,...] [--pin32 ADDR=VALUE]
+//             [--capture funcs.txt --capture-max K] [--count-calls funcs.txt]
 //
 // Input script, one command per line ('#' comments):
 //   <frame> <BUTTON[+BUTTON...]> <hold_frames>     e.g.  300 START 6
@@ -18,6 +19,17 @@
 // Outputs in <outdir>: hashes.txt (frame, hash, PC of ARM9), shot_<frame>.ppm,
 // sram.bin (battery save at exit), ram_<frame>.bin (memory snapshot used by
 // tools/difftest.py: 4 MiB main RAM, then 32 KiB ITCM, then 16 KiB DTCM).
+//
+// --capture records the CPU state at entry to the listed functions (needs the
+// melonDS capture patch, tools/boot_test/melonds-capture.patch, and forces the
+// interpreter). funcs.txt has one "ADDRESS NAME" per line. For each function the
+// 1st, 2nd, 4th, 8th, ... call is recorded, up to K per function, as
+// <outdir>/captures/NAME/N.bin.z: zlib-compressed header (magic "CAP1", address,
+// frame, r0-r15, cpsr) + 4 MiB main RAM + 32 KiB ITCM + 16 KiB DTCM.
+// tools/difftest.py replays these states against original and decompiled code.
+//
+// --count-calls only counts how often each listed function is entered and
+// writes <outdir>/calls.txt ("ADDRESS NAME COUNT"); used for coverage reports.
 //
 // --pin32 rewrites a main-RAM word before every frame. It is a diagnostic for
 // comparing builds whose code runs at different speeds: pinning the game's
@@ -46,6 +58,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <sys/stat.h>
+#include <zlib.h>
 
 using namespace melonDS;
 
@@ -175,6 +189,49 @@ void DynamicLibrary_Unload(DynamicLibrary*) {}
 void* DynamicLibrary_LoadFunction(DynamicLibrary*, const char*) { return nullptr; }
 }
 
+// ---------------------------------------------------------------- capture
+struct CaptureState
+{
+    NDS* nds = nullptr;
+    std::string outdir;
+    std::map<u32, std::string> names;
+    std::map<u32, u32> calls, saved;
+    u32 maxPerFunc = 6;
+    bool countOnly = false;
+    int frame = 0;
+    std::vector<u8> map;
+};
+
+static void CaptureCallback(ARMv5* cpu, u32 addr, void* user)
+{
+    auto* st = (CaptureState*)user;
+    u32 n = ++st->calls[addr];
+    if (st->countOnly) return;
+    if ((n & (n - 1)) != 0) return;               // 1st, 2nd, 4th, 8th, ... call
+    if (st->saved[addr] >= st->maxPerFunc) return;
+    u32 idx = st->saved[addr]++;
+
+    std::vector<u8> raw;
+    auto put32 = [&](u32 v) { for (int i = 0; i < 4; i++) raw.push_back((u8)(v >> (8 * i))); };
+    raw.insert(raw.end(), {'C', 'A', 'P', '1'});
+    put32(addr);
+    put32((u32)st->frame);
+    for (int r = 0; r < 16; r++) put32(cpu->R[r]);
+    put32(cpu->CPSR);
+    raw.insert(raw.end(), st->nds->MainRAM, st->nds->MainRAM + 0x400000);
+    raw.insert(raw.end(), cpu->ITCM, cpu->ITCM + 0x8000);
+    raw.insert(raw.end(), cpu->DTCM, cpu->DTCM + 0x4000);
+
+    uLongf zlen = compressBound(raw.size());
+    std::vector<u8> z(zlen);
+    compress2(z.data(), &zlen, raw.data(), raw.size(), 1);
+    std::string dir = st->outdir + "/captures/" + st->names[addr];
+    mkdir((st->outdir + "/captures").c_str(), 0755);
+    mkdir(dir.c_str(), 0755);
+    FILE* f = fopen((dir + "/" + std::to_string(idx) + ".bin.z").c_str(), "wb");
+    if (f) { fwrite(z.data(), 1, zlen, f); fclose(f); }
+}
+
 // ---------------------------------------------------------------- harness
 struct InputEvent { int frame, hold; u32 keys; bool touch; int x, y; };
 
@@ -242,6 +299,7 @@ int main(int argc, char** argv)
     int frames = 3600, shotEvery = 0; bool jit = true;
     std::set<int> shots, dumps; std::vector<InputEvent> script;
     std::vector<std::pair<u32, u32>> pins;
+    std::string captureList; u32 captureMax = 6; bool countOnly = false;
     for (int i = 3; i < argc; i++)
     {
         std::string a = argv[i];
@@ -255,6 +313,9 @@ int main(int argc, char** argv)
             std::string v = argv[++i]; auto eq = v.find('=');
             pins.push_back({(u32)strtoul(v.substr(0, eq).c_str(), nullptr, 0), (u32)strtoul(v.substr(eq + 1).c_str(), nullptr, 0)});
         }
+        else if (a == "--capture") captureList = argv[++i];
+        else if (a == "--count-calls") { captureList = argv[++i]; countOnly = true; }
+        else if (a == "--capture-max") captureMax = (u32)atoi(argv[++i]);
         else if (a == "--dump-ram") { std::stringstream ss(argv[++i]); std::string t; while (std::getline(ss, t, ',')) dumps.insert(atoi(t.c_str())); }
     }
 
@@ -263,6 +324,7 @@ int main(int argc, char** argv)
     std::vector<u8> rom((std::istreambuf_iterator<char>(rf)), {});
 
     NDSArgs args;
+    if (!captureList.empty()) jit = false;   // the capture hook lives in the interpreter
     if (!jit) args.JIT = std::nullopt;
     auto nds = std::make_unique<NDS>(std::move(args), nullptr);
     RendererSettings rs{1, false, false, false};
@@ -277,6 +339,29 @@ int main(int argc, char** argv)
     nds->RTC.SetDateTime(2026, 1, 1, 12, 0, 0);   // fixed clock => deterministic runs
     nds->SetupDirectBoot("game.nds");
     nds->Start();
+
+    CaptureState cap;
+    if (!captureList.empty())
+    {
+        std::ifstream cl(captureList);
+        std::string line;
+        cap.nds = nds.get(); cap.outdir = outdir; cap.maxPerFunc = captureMax; cap.countOnly = countOnly;
+        cap.map.assign(0x400000 / 2, 0);
+        while (std::getline(cl, line))
+        {
+            std::istringstream ss(line); std::string a, name;
+            if (!(ss >> a >> name)) continue;
+            u32 addr = (u32)strtoul(a.c_str(), nullptr, 16) & ~1u;
+            if (addr - 0x02000000 >= 0x400000) continue;
+            cap.names[addr] = name;
+            cap.map[(addr - 0x02000000) >> 1] = 1;
+        }
+        nds->ARM9.CaptureMap = cap.map.data();
+        nds->ARM9.CaptureBase = 0x02000000;
+        nds->ARM9.CaptureSize = 0x400000;
+        nds->ARM9.CaptureCallback = CaptureCallback;
+        nds->ARM9.CaptureUser = &cap;
+    }
 
     std::string hpath = outdir + "/hashes.txt";
     FILE* hf = fopen(hpath.c_str(), "w");
@@ -295,6 +380,7 @@ int main(int argc, char** argv)
         if (touch) nds->TouchScreen(tx, ty); else nds->ReleaseScreen();
 
         for (auto& p : pins) memcpy(&nds->MainRAM[p.first & 0x3FFFFF], &p.second, 4);
+        cap.frame = fr;
         nds->RunFrame();
         // drain audio so the output buffer never fills
         s16 audio[4096 * 2];
@@ -315,6 +401,13 @@ int main(int argc, char** argv)
         }
     }
     fclose(hf);
+    if (countOnly)
+    {
+        FILE* cf = fopen((outdir + "/calls.txt").c_str(), "w");
+        for (auto& [addr, name] : cap.names)
+            fprintf(cf, "%08x %s %u\n", addr, name.c_str(), cap.calls.count(addr) ? cap.calls[addr] : 0);
+        fclose(cf);
+    }
     if (!g_sram.empty())
     {
         FILE* s = fopen((outdir + "/sram.bin").c_str(), "wb");

@@ -17,8 +17,13 @@ python3 tools/build.py decomp --quiet
 
 [[ -f build/ram_snapshot_4900_gameplay.bin ]] || tools/make_snapshots.sh
 echo
+echo "== recording real calls of decompiled functions during the boot script"
+python3 tools/capture.py --decompiled
+echo
 echo "== differential tests (original machine code vs. decompiled C)"
-python3 tools/difftest.py | tail -n 1
+python3 tools/difftest.py > build/difftest.log || { grep -E "FAIL|NOT TESTED" build/difftest.log; tail -n 1 build/difftest.log; exit 1; }
+grep -E "NOT TESTED" build/difftest.log || true
+tail -n 1 build/difftest.log
 
 echo
 echo "== boot tests ($FRAMES frames: title, menus, intro, dialogue, walking around)"

@@ -14,20 +14,9 @@ everything else is built from it.
 | ROM extracted, rebuilt **byte-identical** | done (`sha1 6c36f7fc66999f5f31781163270a7b56efc88a41`) |
 | ARM9 code split into functions | done: **3,682 functions**, ~695 KB of code, with 11,833 data pointers and 13,783 calls/branches recorded as relocations |
 | Matching build from relocatable objects with the free GNU toolchain | done: byte-identical |
-| Code can move ("shiftable") | done: 4 KiB inserted mid-code still plays the test route with an identical save |
-| Decompiled to C | **60 functions (1.6%)** in 3 translation units, each verified against the original machine code |
+| Code can move ("shiftable") | done: 4 KiB inserted near the start of the code still plays the test route with an identical save |
+| Decompiled to C | in progress, batch by batch: see **[PROGRESS.md](PROGRESS.md)**. Every decompiled function is verified against the original machine code |
 | Native PC port | not started; see [Road to a PC port](#road-to-a-pc-port) |
-
-```
-$ make progress
-translation units decompiled : 3
-    src/sdk/mi/mi_memory.c      NitroSDK MI (memory interface) CPU copy / fill routines
-    src/game/math_util.c        Game math helpers and small accessors
-    src/game/game_root.c        Guarded accessors for the game's root object
-functions decompiled         : 60 / 3682 (1.63%)
-code bytes decompiled        : 2686 / 695274 (0.39%)
-functions with real names    : 100 / 3682
-```
 
 ### What you have and what you don't
 
@@ -109,24 +98,25 @@ ROM and is not part of the repository.
 ## Decompiling a function
 
 1. **Pick a range.** A translation unit (TU) is a contiguous address range of whole functions.
-   Small leaf functions are the easiest place to start:
-   `python3 tools/funcinfo.py --leaf --max-size 0x40 --range 0x02040000 0x02050000`
-2. **Read it.** `python3 tools/show.py func_02040abc` (run `make asm` first).
-3. **Declare the TU** in `config/arm9/delinks.txt`:
-   ```
-   src/game/my_file.c:
-       complete
-       .text       start:0x02040abc end:0x02040b20
-   ```
-4. **Write the C** in `src/game/my_file.c`. Every function in the range must be defined. Refer
-   to other code and data by their names in `symbols.txt` (`extern` declarations). Add a
-   `@difftest` line describing the arguments (see the top of `tools/difftest.py`):
+   The work proceeds through the code in address order:
+   `python3 tools/funcinfo.py --range 0x02040000 0x02041000`
+2. **Read it.** `python3 tools/draft.py 0x02040abc 0x02040b20 [--asm]` prints, per function, a
+   Ghidra draft (literal-pool values filled in, how often the boot script calls it) and
+   optionally the disassembly. Drafts come from `tools/ghidra_export.sh` (optional, needs
+   Ghidra 11 + JDK 21). Treat them as hints: Ghidra often misses pass-through arguments and
+   return values, so check the assembly (`make asm`, `tools/show.py`).
+3. **Declare the TU**: `python3 tools/new_tu.py src/game/MyFile.c 0x02040abc 0x02040b20`
+4. **Write the C.** Every function in the range must be defined. Include `game.h`; declare
+   callees in `include/functions.h` and data in `include/data.h` (one declaration each, so
+   all callers agree). Functions the boot script reaches are verified automatically from
+   recordings; for the others add `@difftest` lines (see the top of `tools/difftest.py`):
    ```c
    /* @difftest ptr:64:4 s32 */
    fx32 func_02040abc(const fx32 *vec, s32 index) { ... }
    ```
 5. **Name things** when you know what they are: `python3 tools/rename.py func_02040abc Vec_Get`.
-6. **Verify**: `make && make difftest && make check`.
+6. **Verify**: `python3 tools/capture.py --tu src/game/MyFile.c` (records real calls), then
+   `python3 tools/difftest.py src/game/MyFile.c`, and finally `make check`.
 
 ## Verifying non-matching code
 
@@ -134,20 +124,28 @@ The C is compiled with GCC, not the original Metrowerks compiler, so the output 
 byte-identical. Three checks stand in for byte-matching:
 
 **1. Differential CPU testing** (`tools/difftest.py`). Each decompiled function and its original
-machine code run side by side in Unicorn (ARMv5 CPU emulator), from real memory snapshots of the
-running game (title screen, intro, gameplay), with hundreds of generated inputs per snapshot. Return
-values, callee-saved registers and **every byte of memory** must be identical after the call. Calls
-into not-yet-decompiled code execute the original code in both runs. The tester also counts 8-bit
-writes to VRAM, because the DS hardware drops them. Current result:
-`89/89 test configurations passed (60 functions)`: 78,000 side-by-side calls in total.
+machine code run side by side in Unicorn (ARMv5 CPU emulator) from the same starting state, and
+afterwards the return value, the callee-saved registers and **every byte of memory** must be
+identical. Calls into not-yet-decompiled code execute the original code in both runs. The tester
+also counts 8-bit writes to VRAM, because the DS hardware drops them. Starting states come from
+two sources:
+
+* **Recorded game calls.** `tools/capture.py` plays the boot script on the original game with a
+  hook in the emulator's CPU loop and saves the complete CPU and memory state at entry to the
+  1st, 2nd, 4th, 8th... call of each function. Replaying those gives each function the exact
+  inputs the game really uses. The boot script reaches about half of all functions.
+* **Generated inputs** for everything else, described by `@difftest` annotations, starting
+  from memory snapshots of the running game (title screen, intro, gameplay).
+
+The test run also lists any decompiled function that neither source covers.
 
 This catches subtle bugs. In the first version of `MI_CpuFill8`, GCC merged a deliberate 16-bit
 read-modify-write into a single byte store. That is legal C, but on a DS it silently does nothing
 when the target is VRAM. The VRAM check failed, and the fix (`volatile` halfword access) is
 documented in the source.
 
-**2. Shift test** (`make shifted` + boot test). The original code with 4 KiB inserted before
-`0x0202a5d0`, which moves about 75% of the program, all data and the heap. The scripted run differs
+**2. Shift test** (`make shifted` + boot test). The original code with 4 KiB inserted before the
+second translation unit, which moves nearly the whole program, all data and the heap. The scripted run differs
 from the original in 11 of 5,200 frames (a sparkle drawn at a slightly different moment), then
 reconverges, and the save data is byte-identical. Getting there required adding relocations that
 automatic analysis missed (see technical notes). Without them, the shifted game crashed at the
@@ -183,6 +181,13 @@ diverges in 41% of frames. The decomp build diverges in 43%.
 * **Secure-area CRC.** The header's secure-area CRC needs the DS BIOS key table to compute. It is
   restored from the original when the first 16 KiB of code are unchanged. Otherwise it is left
   at 0, which emulators and flashcarts ignore.
+* **Hand-written assembly** at `0x02000df4`-`0x02001930` (a decompressor and audio filter
+  routines that pass values in non-standard registers) stays as original code.
+* **No LDRD/STRD.** C is compiled for ARMv5T instead of the CPU's ARMv5TE: the game's code only
+  keeps 4-byte alignment, and doubleword loads/stores need 8. 64-bit fields are accessed as two
+  words (`Get64`/`Put64` in `include/game.h`).
+* **Debug strings** left in the game name some original source files (`TextActor.cpp`,
+  `Actor.cpp`, ... about 35 in total); TUs are named after them where known.
 * **ABI.** GCC uses AAPCS and the original uses ATPCS. They agree for 32-bit integers and
   pointers. Watch out for 64-bit arguments (register-pair alignment) and structs passed or
   returned by value.
