@@ -86,3 +86,7 @@ src/game/ScriptCmd6.c:
 src/game/Dialog1.c:
     complete
     .text       start:0x0200fb74 end:0x02010210
+
+src/game/Dialog2.c:
+    complete
+    .text       start:0x02010210 end:0x02010ec8
