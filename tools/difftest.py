@@ -39,7 +39,7 @@ Memory setup (applied to the starting state of both runs):
 Options after the arguments: `cases=N` per snapshot (default 300).
 A function may carry several @difftest lines (e.g. RAM and VRAM pointers).
 
-Usage: difftest.py [function-name | src/file.c ...] [--snapshot ram.bin ...] [--cases N]
+Usage: difftest.py [function-name | src/file.c ...] [--snapshot ram.bin ...] [--cases N] [--max-cases N]
                    [--replay-only | --no-replay]
 
 Every function defined in src/ that was called during the boot script (and has
@@ -499,6 +499,8 @@ def main():
     ap.add_argument("--snapshot", action="append",
                     help="memory snapshot(s) to start from (default: build/ram_snapshot*.bin)")
     ap.add_argument("--cases", type=int, default=None, help="cases per test and snapshot")
+    ap.add_argument("--max-cases", type=int, default=None,
+                    help="cap the cases per test and snapshot (quick regression runs)")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--no-replay", action="store_true", help="skip recorded-call replays")
     ap.add_argument("--replay-only", action="store_true", help="only run recorded-call replays")
@@ -562,6 +564,8 @@ def main():
                     failures += 1
                     continue
                 n = a.cases or int(opts.get("cases", 300))
+                if a.max_cases:
+                    n = min(n, a.max_cases)
                 total, faults, result = 0, 0, None
                 for sp, machine in zip(snap_paths, machines):
                     ok, i, args, why, f = run_test(machine, func, spec, opts, syms, modes, cand_syms, n, a.seed)

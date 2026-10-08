@@ -92,7 +92,7 @@ s32 func_0200bec8(void *self, s32 a, s32 b, s32 t)
 }
 
 /* 0x0200bf10: advance the transition by dt
- * @difftest $Z=ptr:0x58:4 @$Z+0x28:32=int:0:0x1000 @$Z+0x2c:32=int:0:0x2000 @$Z+0x14:32=int:0:0x1000 $Z int:0:0x400 */
+ * @difftest $Z=ptr:0x58:4 @$Z+0x28:32=int:0:0x1000 @$Z+0x2c:32=int:0:0x2000 @$Z+0x14:32=int:0:0x1000 $Z int:0:0x400 cases=40 */
 void func_0200bf10(u8 *z, s32 dt)
 {
     s32 t, v;
