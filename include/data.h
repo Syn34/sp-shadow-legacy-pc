@@ -25,6 +25,22 @@ extern char data_020bca68[];         /* number text buffer */
 extern const char data_020bca74[];
 extern u32 data_020deebc[];
 
+/* ---- Actor.cpp */
+extern const char data_020bca78[];   /* "Actor.cpp" */
+extern const char data_020bca84[];   /* "actorKillAll::pActor->killFunction()\n" */
+extern const char data_020bcaac[];   /* actorKillAll debug message */
+extern const char data_020bcad0[];   /* actorKillAll debug message */
+extern u8 *data_020c3b64;            /* table of 0x2c-byte records */
+extern u8 *data_020c3b68;            /* table of 12-byte {?, first, last} index ranges */
+
+/* std::vector<Actor *>-like container: {data, size, capacity} */
+typedef struct PtrVec {
+    void **items;
+    s32 count;
+    s32 cap;
+} PtrVec;
+extern PtrVec data_020d9ea0[];       /* actor lists, one per layer */
+
 /* ---- ground-shadow probe offsets (fx32) */
 extern const fx32 data_020bc9f0, data_020bc9f8, data_020bc9fc, data_020bca08,
     data_020bca18, data_020bca20, data_020bca24, data_020bca28, data_020bca2c,

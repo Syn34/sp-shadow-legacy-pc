@@ -41,4 +41,16 @@ static inline fx32 FxMul(fx32 a, fx32 b)
     return (fx32)((u64)((s64)a * b + 0x800) >> 12);
 }
 
+/* fx32 radians -> 16-bit angle index (65536 per turn), rounded */
+static inline u32 FxRadToIdx(fx32 rad)
+{
+    u64 prod = (u64)(s64)rad * 0x28BE60DB9391ull;   /* rad * 65536 / (2*pi), Q44 */
+    return (((u32)(prod >> 32) + 0x800) << 4) >> 16;
+}
+#define FX_SIN_RAD(rad) (FX_SinCosTable_[(FxRadToIdx(rad) >> 4) * 2])
+#define FX_COS_RAD(rad) (FX_SinCosTable_[(FxRadToIdx(rad) >> 4) * 2 + 1])
+
+/* Call slot N (byte offset 4*N) of a C++ object's vtable. */
+#define VCALL(obj, off, type) ((type)(*(void ***)(obj))[(off) / 4])
+
 #endif

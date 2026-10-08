@@ -58,6 +58,8 @@ CFLAGS = [
     "-march=armv5t", "-mtune=arm946e-s", "-marm", "-mthumb-interwork", "-mfloat-abi=soft",
     "-O2", "-std=gnu11", "-ffreestanding", "-fno-builtin", "-nostdlib",
     "-fno-common", "-fno-strict-aliasing", "-fshort-wchar",
+    # signed overflow wraps, as it does in the original code
+    "-fwrapv",
     "-fno-unwind-tables", "-fno-asynchronous-unwind-tables",
     # never turn copy/fill loops into memcpy/memset calls: there is no libc to
     # link against, and the SDK copy routines must keep their 16/32-bit accesses
@@ -116,6 +118,20 @@ def prepare():
     return [l.strip().strip('"') for l in open("build/objects.txt") if l.strip()]
 
 
+def aeabi_map():
+    """GCC runtime helper -> game routine (tools/aeabi.txt)."""
+    out = {}
+    for line in open("tools/aeabi.txt"):
+        line = line.split("#")[0].split()
+        if len(line) == 2:
+            out[line[0]] = line[1]
+    return out
+
+
+def aeabi_defsyms():
+    return [f"--defsym={k}={v}" for k, v in aeabi_map().items()]
+
+
 def insert_padding(ld_path, nbytes):
     """Insert padding before the second .text input of the ARM9 module."""
     lines = open(ld_path).read().split("\n")
@@ -166,7 +182,7 @@ def build(mode, objects):
     run([sys.executable, "-I", "tools/lcf2ld.py", "build/arm9.lcf", "build/objects_link.txt", "build/arm9.ld"])
     if mode == "shifted":
         insert_padding("build/arm9.ld", SHIFT_BYTES)
-    run([LD, "--use-blx", "--no-warn-rwx-segments", "-T", "build/arm9.ld",
+    run([LD, "--use-blx", "--no-warn-rwx-segments", "-T", "build/arm9.ld", *aeabi_defsyms(),
          "-Map", "build/arm9.map", "-o", "build/arm9.elf", *link_objs])
 
     # 6. binaries + ROM config
