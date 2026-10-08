@@ -42,3 +42,7 @@ src/game/Actor4.c:
 src/game/Appearances1.c:
     complete
     .text       start:0x02007efc end:0x02008b04
+
+src/game/Appearances2.c:
+    complete
+    .text       start:0x02008b04 end:0x02009548
