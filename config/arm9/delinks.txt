@@ -106,3 +106,7 @@ src/game/FileSystem.c:
 src/game/Font.c:
     complete
     .text       start:0x02012b14 end:0x02013b78
+
+src/game/Protagonist1.c:
+    complete
+    .text       start:0x02013b78 end:0x020145bc
