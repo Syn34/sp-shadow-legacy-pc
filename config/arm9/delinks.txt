@@ -214,3 +214,7 @@ src/game/BossBattle1.c:
 src/game/BossBattle2.c:
     complete
     .text       start:0x0202b968 end:0x0202d058
+
+src/game/BossActors.c:
+    complete
+    .text       start:0x0202d058 end:0x0202e000
