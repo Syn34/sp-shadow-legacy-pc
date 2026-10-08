@@ -35,7 +35,7 @@ void func_02001930(void *text, u32 *args)
     work = func_0207ff70(0x78, data_020bc9e0, 0x1b1);
     pixels = func_0207ff48((BITS(U32_AT(text, 0xa8), 13, 1) + 1) * 0x780, data_020bc9e0, 0x1b2);
     func_020139f8(work, pixels, BITS(U32_AT(text, 0xa8), 13, 1));
-    func_020134b8(0, 0, 0, 0xf0, args, 0, &limit);
+    func_020134b8(0, 0, 0, 0xf0, (const char **)args, 0, &limit);
 
     if (U16_AT(text, 0xb2) <= 8) {
         SET_BITS(U32_AT(text, 0xa8), 30, 2, 1);

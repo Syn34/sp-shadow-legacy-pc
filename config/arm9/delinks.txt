@@ -102,3 +102,7 @@ src/game/Fbfsub.c:
 src/game/FileSystem.c:
     complete
     .text       start:0x020126d0 end:0x02012b14
+
+src/game/Font.c:
+    complete
+    .text       start:0x02012b14 end:0x02013b78

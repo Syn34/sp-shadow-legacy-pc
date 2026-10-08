@@ -22,9 +22,9 @@ void MI_CpuFill8(void *dest, u8 data, u32 size);
 /* ---- graphics / text */
 void func_0207fed8(s32 a, void *dest, const void *src, u32 size, s32 e);
 void func_020139f8(void *a, void *b, u32 flag);
-void func_020134b8(s32 a, s32 b, s32 c, s32 d, u32 *args, s32 f, s32 *g);
-u32 func_020138a0(const char *str);
-u32 func_02013868(const char *str);
+u32 func_020134b8(u32 tile, s32 x, s32 y, s32 maxw, const char **pstr, u32 align, s32 *left);
+s32 func_020138a0(const char *str);
+s32 func_02013868(const char *str);
 void func_0201391c(s32 a, s32 b, s32 c);
 void func_02029228(u32 a, u32 b, u32 c);
 void func_0200bd20(s32 a, s32 b, s32 c);

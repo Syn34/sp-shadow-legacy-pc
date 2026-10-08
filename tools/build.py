@@ -64,6 +64,10 @@ CFLAGS = [
     # never turn copy/fill loops into memcpy/memset calls: there is no libc to
     # link against, and the SDK copy routines must keep their 16/32-bit accesses
     "-fno-tree-loop-distribute-patterns",
+    # no tail calls: a tail call that passes arguments on the stack reuses the
+    # caller's outgoing argument area, which the original (MWCC) callers may
+    # still rely on after the call
+    "-fno-optimize-sibling-calls",
     "-Wall", "-Wextra", "-Wno-unused-parameter", "-Werror=implicit-function-declaration",
     "-Iinclude",
 ]
