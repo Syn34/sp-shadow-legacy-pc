@@ -38,7 +38,7 @@ void func_02003b98(void *obj, s32 x, s32 y);
 void func_02003c74(void *actor, s32 x, s32 y);   /* place at an fx32 position */
 void func_02003890(void *obj, s32 *pos);
 s32 func_0201a0a0(s32 *xz, void *obj);
-void func_02028678(s32 value, char *buf);
+char *func_02028678(s32 value, char *buf);
 
 void func_02002164(void *self);               /* empty destructor */
 void func_020022e4(void *self);               /* empty destructor */
@@ -87,7 +87,7 @@ void func_0201f004(void);
 void *func_0201f490(void);                    /* camera */
 void func_02007708(void *actor);
 void func_02028f04(void);
-void func_0202926c(void *actor, void *pixels);
+u32 func_0202926c(void *actor, const void *pixels);
 u8 *func_020436f0(u32 id);
 void func_020504b8(void *actor);
 void func_02050680(void *actor);
