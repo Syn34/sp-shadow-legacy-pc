@@ -74,3 +74,7 @@ src/game/ScriptCmd3.c:
 src/game/ScriptCmd4.c:
     complete
     .text       start:0x0200e4d4 end:0x0200edb4
+
+src/game/ScriptCmd5.c:
+    complete
+    .text       start:0x0200edb4 end:0x0200f244
