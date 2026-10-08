@@ -80,7 +80,7 @@ void *func_02016f24(void *obj);
 void func_02017180(void *obj);
 void func_02018ba4(void);
 void func_0201a390(u32 oam);
-void func_0201a7c8(u32 oam, u32 *attr);
+s32 func_0201a7c8(u32 oam, const u32 *attr);
 void func_0201aa88(void *actor);
 void func_0201c428(s32 *out);
 void func_0201f004(void);
