@@ -58,3 +58,7 @@ src/game/BG2.c:
 src/game/Color.c:
     complete
     .text       start:0x0200b36c end:0x0200be9c
+
+src/game/ScriptCmd1.c:
+    complete
+    .text       start:0x0200be9c end:0x0200c614

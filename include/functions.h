@@ -73,7 +73,7 @@ u16 func_02029284(s32 v, u32 b, u32 c);
 void func_0200809c(void *actor);
 void func_02008104(u32 shape, u32 size, s32 *dim);   /* OBJ shape/size -> pixels */
 void func_02008130(s32 a, s32 b);
-void func_0200c110(void *obj, u32 v);
+void func_0200c110(u8 *zoom, s32 dt);
 s32 func_0200be9c(void *obj);
 void *func_02016f24(void *obj);
 void func_02017180(void *obj);
