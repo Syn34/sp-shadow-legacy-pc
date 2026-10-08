@@ -39,7 +39,16 @@ typedef struct PtrVec {
     s32 count;
     s32 cap;
 } PtrVec;
-extern PtrVec data_020d9ea0[];       /* actor lists, one per layer */
+extern PtrVec data_020d9ea0[];       /* active actors, per screen */
+extern PtrVec data_020d9f18[];       /* free actors, per screen */
+extern PtrVec data_020d9f30[];       /* actors drawn as sprites this frame, per screen */
+extern u8 *data_020c3b60;            /* table of 0x60-byte records */
+extern u8 *data_020df0b4;
+extern s8 data_020df17c;
+extern u8 data_020df1bc[];
+extern u8 data_020df598[];           /* per screen 0x13ec bytes; +0x13e9: OAM manager id */
+extern u8 data_020e1f50[];
+extern u32 data_020bf6a0;
 
 /* ---- ground-shadow probe offsets (fx32) */
 extern const fx32 data_020bc9f0, data_020bc9f8, data_020bc9fc, data_020bca08,

@@ -1,7 +1,6 @@
 /*
- * Actor base class, part 1: sprite animation scripts, movement vectors and
- * the per-layer actor lists.
- * ARM9 main, 0x020030d0 - 0x020044a0 (40 functions).
+ * Actor base class, part 1: animation scripts, movement and actor lists.
+ * ARM9 main, 0x020030d0 - 0x020044a0 (39 functions).
  *
  * Source file "Actor.cpp" (allocation debug info). Actor fields used here:
  *   +0x04  flags (bit 2: active in layer updates)
@@ -22,7 +21,7 @@
 #define A_FLAGS110(a) U32_AT(a, 0x110)
 
 /* frame record of the current frame inside the animation data */
-static inline u8 *FrameEntry(u8 *anim, u8 *a)
+static inline u8 *FrameEntry(u8 *anim, void *a)
 {
     return anim + 0xc + U16_AT(anim, 0xc + U8_AT(a, 0xb3) * 2);
 }
@@ -220,7 +219,7 @@ void func_02003798(s32 *out, const s32 *in, const s32 *scale)
 }
 
 /* 0x020037ec: pixel data of the current animation frame */
-void *func_020037ec(u8 *a)
+void *func_020037ec(void *a)
 {
     u8 *ent = FrameEntry(func_02003958(a), a);
     u8 *base;
@@ -232,7 +231,7 @@ void *func_020037ec(u8 *a)
 
 /* 0x0200384c: size of the current animation frame
  * @difftest $N=ptr:0x100:4 $A=ptr:0x120:4 @$A+0xe8:32=$N $A ptr:8:4 */
-void func_0200384c(u8 *a, u32 *out)
+void func_0200384c(void *a, u32 *out)
 {
     u8 *ent = FrameEntry(func_02003958(a), a);
     out[0] = U8_AT(ent, 2);

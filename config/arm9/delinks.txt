@@ -26,3 +26,7 @@ src/game/TextActor.c:
 src/game/Actor1.c:
     complete
     .text       start:0x020030d0 end:0x020044a0
+
+src/game/Actor2.c:
+    complete
+    .text       start:0x020044a0 end:0x02005f20

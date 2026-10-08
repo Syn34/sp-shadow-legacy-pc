@@ -309,8 +309,9 @@ void func_02001fac(void *actor, s32 value)
     Put64((u8 *)actor + 0xf0, now + delay);
 }
 
-/* 0x02002164 */
-void func_02002164(void) {}
+/* 0x02002164: empty destructor (2D vector)
+ * @difftest u32 */
+void func_02002164(void *self) { (void)self; }
 
 /* 0x02002168: create the actor's number-popup text actor
  * @difftest zero:0x200 cases=20 */
@@ -368,8 +369,9 @@ u32 func_02002270(void *actor, const s32 *mtx44, const s32 *in, s32 *out3, s32 *
     return func_0201a0a0(xz, actor);
 }
 
-/* 0x020022e4 */
-void func_020022e4(void) {}
+/* 0x020022e4: empty destructor (3D vector)
+ * @difftest u32 */
+void func_020022e4(void *self) { (void)self; }
 
 /* 0x020022e8: out = in * M (4x4 fx32 matrix, row vector) */
 void func_020022e8(s32 *out, const s32 *m, const s32 *in)

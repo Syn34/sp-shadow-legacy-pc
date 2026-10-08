@@ -157,7 +157,7 @@ file** and ends at the same spot (the final frame differs by a 2×3-pixel animat
 Individual frames diverge, because the C runs at a different speed than the hand-written original
 assembly, and this game seeds its `rand()` from a timing-dependent counter. For scale: the
 *unmodified* original ROM, run under melonDS's JIT versus its interpreter (two timing models),
-diverges in 41% of frames. The decomp build diverges in roughly half of the frames (55% as of batch 2).
+diverges in 41% of frames. The decomp build diverges in roughly half of the frames (10% as of batch 3).
 
 ## Technical notes
 
