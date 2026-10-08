@@ -154,3 +154,7 @@ src/game/Screen1.c:
 src/game/Scroll1.c:
     complete
     .text       start:0x0201b9c0 end:0x0201c428
+
+src/game/Scroll2.c:
+    complete
+    .text       start:0x0201c428 end:0x0201d638
