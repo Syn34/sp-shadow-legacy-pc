@@ -106,7 +106,7 @@ def find_tests(names):
                 args = [x for x in spec if "=" not in x]
                 opts = dict(x.split("=", 1) for x in spec
                             if "=" in x and not x.startswith(("$", "@")))
-                opts["_setup"] = [x for x in spec if x.startswith(("$", "@"))]
+                opts["_setup"] = [x for x in spec if x.startswith("@") or (x.startswith("$") and "=" in x)]
                 # which return registers carry a value: void -> none, 64-bit -> r0:r1
                 opts["_ret"] = 0 if rtype == "void" else 2 if re.search(r"\b(u64|s64|long long)\b", rtype) else 1
                 opts["_label"] = " ".join(x for x in spec if "=" not in x or x.startswith(("$", "@")))
@@ -154,6 +154,10 @@ def build_candidate(path, syms, workdir):
         for name, addr in syms.items():
             if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
                 f.write(f"PROVIDE({name} = {addr:#x});\n")
+        from build import aeabi_map
+        for helper, target in aeabi_map().items():
+            if target in syms:
+                f.write(f"PROVIDE({helper} = {syms[target]:#x});\n")
     elf = os.path.join(workdir, "cand.elf")
     sh([CROSS + "ld", "--use-blx", "-T", script, "-o", elf, obj])
     binary = os.path.join(workdir, "cand.bin")

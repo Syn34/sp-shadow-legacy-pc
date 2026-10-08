@@ -1,0 +1,9 @@
+# GCC soft-float/runtime helpers -> the game's own routines (CodeWarrior/ARM fplib).
+# Decompiled C can use float arithmetic; it then calls exactly the same code as
+# the original (including its floating-point status flags).
+# gcc_helper            game_symbol
+__aeabi_fadd            _fadd
+__aeabi_fsub            _fsub
+__aeabi_i2f             _fflt
+__aeabi_ui2f            _ffltu
+__aeabi_f2iz            _ffix

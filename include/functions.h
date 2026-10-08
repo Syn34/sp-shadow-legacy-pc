@@ -33,6 +33,41 @@ void func_02003890(void *obj, s32 *pos);
 s32 func_0201a0a0(s32 *xz, void *obj);
 void func_02028678(s32 value, char *buf);
 
+void func_02002228(void *actor, void *anim);
+void func_020036a4(void *actor, s32 v);
+void func_020036c0(s32 *rect);
+void func_020036c4(void *actor, const s32 *rect);
+void func_020036e8(s32 *rect, const s32 *a, const s32 *b, const s32 *c, const s32 *d);
+void func_02003720(s32 *rect);
+u32 *func_02003738(void *actor);
+void func_02003798(s32 *out, const s32 *in, const s32 *scale);
+void func_020038d4(s32 *out, const s32 *in, s32 shift);
+void *func_02003958(void *actor);
+void func_020039d0(void *actor, s32 v);
+void func_020039e8(void *actor, s32 v);
+void func_02003b08(s32 *out, const s32 *in, s32 shift);
+void func_02003cbc(void *actor, s32 frame);
+void func_02003ddc(void *actor, void *anim);
+s32 func_02004490(const char *fmt, ...);
+void func_0201f6c8(s32 *pos);
+void func_0205047c(void *actor);
+void func_020291ec(u32 a, u32 b, u32 c);
+u16 func_02029284(s32 v, u32 b, u32 c);
+
+/* ---- resources / files */
+void *func_02012a64(s32 handle);              /* lock resource, return data */
+void func_020129ac(s32 handle);               /* unlock resource */
+void func_0207fe28(const char *file, s32 line);
+void func_0207fe24(void);
+void func_02080488(void *file, u32 id);       /* open */
+u32 func_02080388(void *file);                /* size */
+void func_02080418(void *dest, u32 size, s32 n, void *file);  /* read */
+void func_02080458(void *file);               /* close */
+
+/* ---- containers */
+void func_020062f0(void *vec, void **value, u32 tag);   /* push_back (grow) */
+void func_02006240(void *vec, void **pos, u32 tag);     /* erase */
+
 /* ---- timing */
 void *func_020062d0(void);
 u64 func_020822c8(void *timer);
