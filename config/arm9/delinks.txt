@@ -110,3 +110,7 @@ src/game/Font.c:
 src/game/Protagonist1.c:
     complete
     .text       start:0x02013b78 end:0x020145bc
+
+src/game/Protagonist2.c:
+    complete
+    .text       start:0x020145bc end:0x020157e0
