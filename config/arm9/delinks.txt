@@ -94,3 +94,11 @@ src/game/Dialog2.c:
 src/game/Dialog3.c:
     complete
     .text       start:0x02010ec8 end:0x02011f54
+
+src/game/Fbfsub.c:
+    complete
+    .text       start:0x02011f54 end:0x020126d0
+
+src/game/FileSystem.c:
+    complete
+    .text       start:0x020126d0 end:0x02012b14
