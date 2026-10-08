@@ -134,3 +134,7 @@ src/game/Main1.c:
 src/game/Map1.c:
     complete
     .text       start:0x020186fc end:0x02019620
+
+src/game/Map2.c:
+    complete
+    .text       start:0x02019620 end:0x02019f58
