@@ -126,3 +126,7 @@ src/game/Protagonist4.c:
 src/game/Protagonist5.c:
     complete
     .text       start:0x02016f30 end:0x02017b58
+
+src/game/Main1.c:
+    complete
+    .text       start:0x02017b58 end:0x020186fc
