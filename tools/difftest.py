@@ -189,6 +189,7 @@ class Machine:
         self.uc.mem_write(CAND, cand_code)
         self.snapshot = snapshot
         self.cand_code = cand_code
+        self.fnmap = {}   # C build function address -> original address
         self.dirty = set()
         self.buffers = bytes(SCRATCH_SIZE)
         self.vbuffers = bytes(0x10000)
@@ -336,8 +337,30 @@ class Machine:
             a = m1.get(page) or self.masked_pristine(page, ign)
             b = m2.get(page) or self.masked_pristine(page, ign)
             if a != b:
-                off = next(j for j in range(min(len(a), len(b))) if a[j] != b[j])
-                return f"memory differs at {page + off:#x}: {a[off]:#04x} (original) vs {b[off]:#04x} (C)"
+                off = self.first_difference(a, b)
+                if off is not None:
+                    return f"memory differs at {page + off:#x}: {a[off]:#04x} (original) vs {b[off]:#04x} (C)"
+        return None
+
+    def same_word(self, orig, cand):
+        """Equal, or the C build's copy of a function stored where the original
+        stores the original function (e.g. an update callback)."""
+        return orig == cand or (self.fnmap.get(cand, -1) | 1) == (orig | 1)
+
+    def first_difference(self, a, b):
+        n = min(len(a), len(b))
+        j = 0
+        while j < n:
+            if a[j] == b[j]:
+                j += 1
+                continue
+            w = j & ~3
+            if w + 4 <= n and self.fnmap:
+                wa, wb = struct.unpack_from("<I", a, w)[0], struct.unpack_from("<I", b, w)[0]
+                if self.same_word(wa, wb):
+                    j = w + 4
+                    continue
+            return j
         return None
 
 
@@ -434,6 +457,12 @@ def gen_args(spec, setup, rng):
 
 
 # ---------------------------------------------------------------- main
+def fnmap(cand_syms, syms):
+    """Address of each C-compiled function -> the original function's address."""
+    return {addr: syms[name] for name, addr in cand_syms.items()
+            if name.startswith("func_") and name in syms}
+
+
 def run_test(machine, func, spec, opts, syms, modes, cand_syms, n, seed):
     rng = random.Random(f"{seed}:{func}:{opts['_label']}")
     orig_addr, thumb = syms[func], modes.get(func) == "thumb"
@@ -449,7 +478,7 @@ def run_test(machine, func, spec, opts, syms, modes, cand_syms, n, seed):
                 return False, i, args, f"original: {f1 or 'ok'} / C: {f2 or 'ok'}", faults
             continue
         check = list(range(opts["_ret"])) + list(range(2, len(r1)))
-        if any(r1[k] != r2[k] for k in check):
+        if any(not machine.same_word(r1[k], r2[k]) for k in check):
             d = [f"{names[k]} {r1[k]:#x} vs {r2[k]:#x}" for k in check if r1[k] != r2[k]]
             return False, i, args, "registers differ: " + ", ".join(d), faults
         why = machine.same_memory(m1, m2)
@@ -476,6 +505,7 @@ def run_replays(func, cand_code, cand_syms, syms, cap_dir, ret):
     for path in files:
         addr, frame, regs, cpsr, mem = load_capture(path)
         machine = Machine(mem, cand_code)
+        machine.fnmap = fnmap(cand_syms, syms)
         f1, r1, m1 = machine.call(addr, bool(cpsr & 0x20), [], bytes(SCRATCH_SIZE), regs=regs)
         f2, r2, m2 = machine.call(cand_syms[func], False, [], bytes(SCRATCH_SIZE), regs=regs)
         tag = f"call recorded at frame {frame} ({os.path.basename(path)})"
@@ -484,7 +514,7 @@ def run_replays(func, cand_code, cand_syms, syms, cap_dir, ret):
         if f1:
             continue
         check = list(range(ret)) + list(range(2, len(r1)))
-        if any(r1[k] != r2[k] for k in check):
+        if any(not machine.same_word(r1[k], r2[k]) for k in check):
             d = [f"{names[k]} {r1[k]:#x} vs {r2[k]:#x}" for k in check if r1[k] != r2[k]]
             return False, len(files), f"{tag}: registers differ: " + ", ".join(d)
         why = machine.same_memory(m1, m2)
@@ -537,6 +567,8 @@ def main():
         for path, ftests in by_file.items():
             cand_code, cand_syms = build_candidate(path, syms, tmp)
             machines = [] if a.replay_only else [Machine(open(sp, "rb").read(), cand_code) for sp in snap_paths]
+            for m in machines:
+                m.fnmap = fnmap(cand_syms, syms)
             if not a.no_replay:
                 rets = find_definitions(path)
                 if names:

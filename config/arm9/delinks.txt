@@ -90,3 +90,7 @@ src/game/Dialog1.c:
 src/game/Dialog2.c:
     complete
     .text       start:0x02010210 end:0x02010ec8
+
+src/game/Dialog3.c:
+    complete
+    .text       start:0x02010ec8 end:0x02011f54
