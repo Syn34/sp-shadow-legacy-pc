@@ -37,7 +37,8 @@ Memory setup (applied to the starting state of both runs):
                               to TARGET (hex address or $NAME+OFFSET)
   e.g. `$R=ptr:16:4 $O=ptr:0x400:4 @020e36a4:8=1 @020e36c8:32=$R @$R+8:32=$O`
 Options after the arguments: `cases=N` per snapshot (default 300).
-    `stub=ADDR[,ADDR...]` makes those functions return at once (r0 unchanged) in
+    `stub=ADDR[:VALUE][,...]` makes those functions return at once (with r0 =
+    VALUE, or r0 unchanged) in
     both runs, the C copy too if one exists. Only for callees that cannot run
     here (card/file I/O, IPC or save waits, halt; operator delete on a scratch
     buffer), so that the code around them can still be compared.
@@ -268,12 +269,16 @@ class Machine:
         self.fault = f"unmapped access at {addr:#x}"
         return False
 
-    def set_stubs(self, addrs):
+    def set_stubs(self, stubs):
+        """stubs: {address: return value or None (r0 unchanged)}"""
         for h in getattr(self, "stub_hooks", []):
             self.uc.hook_del(h)
-        self.stub_hooks = [self.uc.hook_add(UC_HOOK_CODE, self._stub, begin=a, end=a) for a in addrs]
+        self.stub_values = dict(stubs)
+        self.stub_hooks = [self.uc.hook_add(UC_HOOK_CODE, self._stub, begin=a, end=a) for a in stubs]
 
     def _stub(self, uc, addr, size, data):
+        if self.stub_values.get(addr) is not None:
+            uc.reg_write(UC_ARM_REG_R0, self.stub_values[addr] & 0xFFFFFFFF)
         uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR) & ~1)
 
     def _intr(self, uc, intno, data):
@@ -496,15 +501,18 @@ def run_test(machine, func, spec, opts, syms, modes, cand_syms, n, seed):
     orig_addr, thumb = syms[func], modes.get(func) == "thumb"
     faults = 0
     names = ["r0", "r1", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "sp"]
-    stubs = [int(x, 16) for x in opts["stub"].split(",")] if "stub" in opts else []
+    stubs = {}
+    for x in (opts["stub"].split(",") if "stub" in opts else []):
+        a, _, v = x.partition(":")
+        stubs[int(a, 16)] = int(v, 0) if v else None
     # a stubbed function that is itself decompiled is also stubbed in the C build
     by_addr = {a & ~1: n for n, a in syms.items()}
-    stubs += [cand_syms[by_addr[a]] for a in stubs if by_addr.get(a) in cand_syms]
+    stubs.update({cand_syms[by_addr[a]]: v for a, v in list(stubs.items()) if by_addr.get(a) in cand_syms})
     machine.set_stubs(stubs)
     try:
         return _run_cases(machine, func, spec, opts, cand_syms, n, rng, orig_addr, thumb, names)
     finally:
-        machine.set_stubs([])
+        machine.set_stubs({})
 
 
 def _run_cases(machine, func, spec, opts, cand_syms, n, rng, orig_addr, thumb, names):

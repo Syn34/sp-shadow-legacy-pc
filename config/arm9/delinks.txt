@@ -226,3 +226,7 @@ src/game/TitleScreen.c:
 src/game/SpellsMenu1.c:
     complete
     .text       start:0x0202f330 end:0x0202f910
+
+src/game/SpellsMenu2.c:
+    complete
+    .text       start:0x0202f910 end:0x02030b38
