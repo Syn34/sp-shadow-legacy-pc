@@ -206,3 +206,11 @@ src/game/Text2.c:
 src/game/GameRoot0.c:
     complete
     .text       start:0x020298d8 end:0x0202a5d0
+
+src/game/BossBattle1.c:
+    complete
+    .text       start:0x0202aa14 end:0x0202b968
+
+src/game/BossBattle2.c:
+    complete
+    .text       start:0x0202b968 end:0x0202d058

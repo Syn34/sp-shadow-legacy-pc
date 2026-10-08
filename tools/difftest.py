@@ -37,6 +37,12 @@ Memory setup (applied to the starting state of both runs):
                               to TARGET (hex address or $NAME+OFFSET)
   e.g. `$R=ptr:16:4 $O=ptr:0x400:4 @020e36a4:8=1 @020e36c8:32=$R @$R+8:32=$O`
 Options after the arguments: `cases=N` per snapshot (default 300).
+    `stub=ADDR[,ADDR...]` makes those functions return at once (r0 unchanged) in
+    both runs, the C copy too if one exists. Only for callees that cannot run
+    here (card/file I/O, IPC or save waits, halt; operator delete on a scratch
+    buffer), so that the code around them can still be compared.
+    `faultmem=1`: when both versions stop with the same fault, compare memory
+    anyway (for code that runs a long way before an unavoidable fault).
 A function may carry several @difftest lines (e.g. RAM and VRAM pointers).
 
 Usage: difftest.py [function-name | src/file.c ...] [--snapshot ram.bin ...] [--cases N] [--max-cases N]
@@ -57,7 +63,7 @@ import sys
 import tempfile
 import zlib
 
-from unicorn import Uc, UcError, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_MEM_UNMAPPED, UC_HOOK_INTR, UC_HOOK_MEM_WRITE
+from unicorn import Uc, UcError, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_MEM_UNMAPPED, UC_HOOK_INTR, UC_HOOK_MEM_WRITE, UC_HOOK_CODE
 from unicorn.arm_const import (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3, UC_ARM_REG_R4,
                                UC_ARM_REG_R5, UC_ARM_REG_R6, UC_ARM_REG_R7, UC_ARM_REG_R8, UC_ARM_REG_R9,
                                UC_ARM_REG_R10, UC_ARM_REG_R11, UC_ARM_REG_R12, UC_ARM_REG_SP, UC_ARM_REG_LR,
@@ -261,6 +267,14 @@ class Machine:
     def _unmapped(self, uc, access, addr, size, value, data):
         self.fault = f"unmapped access at {addr:#x}"
         return False
+
+    def set_stubs(self, addrs):
+        for h in getattr(self, "stub_hooks", []):
+            self.uc.hook_del(h)
+        self.stub_hooks = [self.uc.hook_add(UC_HOOK_CODE, self._stub, begin=a, end=a) for a in addrs]
+
+    def _stub(self, uc, addr, size, data):
+        uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR) & ~1)
 
     def _intr(self, uc, intno, data):
         self.fault = f"exception/swi {intno}"
@@ -482,6 +496,19 @@ def run_test(machine, func, spec, opts, syms, modes, cand_syms, n, seed):
     orig_addr, thumb = syms[func], modes.get(func) == "thumb"
     faults = 0
     names = ["r0", "r1", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "sp"]
+    stubs = [int(x, 16) for x in opts["stub"].split(",")] if "stub" in opts else []
+    # a stubbed function that is itself decompiled is also stubbed in the C build
+    by_addr = {a & ~1: n for n, a in syms.items()}
+    stubs += [cand_syms[by_addr[a]] for a in stubs if by_addr.get(a) in cand_syms]
+    machine.set_stubs(stubs)
+    try:
+        return _run_cases(machine, func, spec, opts, cand_syms, n, rng, orig_addr, thumb, names)
+    finally:
+        machine.set_stubs([])
+
+
+def _run_cases(machine, func, spec, opts, cand_syms, n, rng, orig_addr, thumb, names):
+    faults = 0
     for i in range(n):
         args, buffers, patches = gen_args(spec, opts["_setup"], rng)
         f1, r1, m1 = machine.call(orig_addr & ~1, thumb, args, buffers, patches)
@@ -490,6 +517,10 @@ def run_test(machine, func, spec, opts, syms, modes, cand_syms, n, seed):
             faults += 1
             if (f1 is None) != (f2 is None):
                 return False, i, args, f"original: {f1 or 'ok'} / C: {f2 or 'ok'}", faults
+            if opts.get("faultmem") and f1 == f2:
+                why = machine.same_memory(m1, m2)
+                if why:
+                    return False, i, args, f"after the same fault ({f1}): {why}", faults
             continue
         check = list(range(opts["_ret"])) + list(range(2, len(r1)))
         if any(not machine.same_word(r1[k], r2[k]) for k in check):
