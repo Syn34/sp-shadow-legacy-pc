@@ -8,6 +8,8 @@
  */
 #include "types.h"
 
+struct PtrVec;
+
 /* ---- memory (x_memory.cpp) */
 void *func_0207ff70(u32 size, const char *file, s32 line);
 void *func_0207ff48(u32 size, const char *file, s32 line);
@@ -15,6 +17,7 @@ void func_0207ff14(void *ptr, const char *file, s32 line);
 
 /* ---- SDK */
 void MI_CpuCopy8(const void *src, void *dest, u32 size);
+void MI_CpuFill8(void *dest, u8 data, u32 size);
 
 /* ---- graphics / text */
 void func_0207fed8(s32 a, void *dest, const void *src, u32 size, s32 e);
@@ -39,6 +42,7 @@ void func_02028678(s32 value, char *buf);
 void func_02002164(void *self);               /* empty destructor */
 void func_020022e4(void *self);               /* empty destructor */
 void func_02002228(void *actor, void *anim);
+void func_020030d0(u8 *actor);                /* advance the sprite animation */
 void func_020036a4(void *actor, s32 v);
 void func_020036c0(s32 *rect);
 void func_020036c4(void *actor, const s32 *rect);
@@ -56,6 +60,9 @@ void func_020039e8(void *actor, s32 v);
 void func_02003b08(s32 *out, const s32 *in, s32 shift);
 void func_02003cbc(void *actor, s32 frame);
 void func_020041e0(void *dst, const void *src);   /* copy 8 bytes */
+void func_020040f4(u8 *dst, const u8 *src);       /* copy camera/scene setup */
+void func_02003be8(void *actor);                  /* reset position from spawn point */
+void func_020042b0(void *item, struct PtrVec *list, struct PtrVec *other);  /* move between lists */
 void func_02003ddc(void *actor, void *anim);
 s32 func_02004490(const char *fmt, ...);
 void func_0201f6c8(s32 *pos);

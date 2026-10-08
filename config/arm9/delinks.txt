@@ -34,3 +34,7 @@ src/game/Actor2.c:
 src/game/Actor3.c:
     complete
     .text       start:0x02005f20 end:0x02007290
+
+src/game/Actor4.c:
+    complete
+    .text       start:0x02007290 end:0x02007efc
