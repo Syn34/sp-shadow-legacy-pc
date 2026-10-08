@@ -108,7 +108,7 @@ void func_02080458(void *file);               /* close */
 
 /* ---- containers */
 void func_020062f0(void *vec, void **value, u32 tag);   /* push_back (grow) */
-void func_02006240(void *vec, void **pos, u32 tag);     /* erase */
+void **func_02006240(struct PtrVec *v, void **pos, u32 tag);   /* erase */
 
 /* ---- timing */
 void *func_020062d0(void);
