@@ -343,17 +343,24 @@ class Machine:
             a = m1.get(page) or self.masked_pristine(page, ign)
             b = m2.get(page) or self.masked_pristine(page, ign)
             if a != b:
-                off = self.first_difference(a, b)
+                off = self.first_difference(a, b, ign)
                 if off is not None:
                     return f"memory differs at {page + off:#x}: {a[off]:#04x} (original) vs {b[off]:#04x} (C)"
         return None
 
-    def same_word(self, orig, cand):
+    def same_word(self, orig, cand, ign=None):
         """Equal, or the C build's copy of a function stored where the original
-        stores the original function (e.g. an update callback)."""
-        return orig == cand or (self.fnmap.get(cand, -1) | 1) == (orig | 1)
+        stores the original function (e.g. an update callback), or two pointers
+        into the dead stack frames of the call (e.g. a stack pointer saved in a
+        thread context: the C frames have other sizes)."""
+        if orig == cand or (self.fnmap.get(cand, -1) | 1) == (orig | 1):
+            return True
+        for lo, hi in ((STACK, STACK + STACK_SIZE), ign or (0, 0)):
+            if lo <= orig < hi and lo <= cand < hi:
+                return True
+        return False
 
-    def first_difference(self, a, b):
+    def first_difference(self, a, b, ign=None):
         n = min(len(a), len(b))
         j = 0
         while j < n:
@@ -361,9 +368,9 @@ class Machine:
                 j += 1
                 continue
             w = j & ~3
-            if w + 4 <= n and self.fnmap:
+            if w + 4 <= n:
                 wa, wb = struct.unpack_from("<I", a, w)[0], struct.unpack_from("<I", b, w)[0]
-                if self.same_word(wa, wb):
+                if self.same_word(wa, wb, ign):
                     j = w + 4
                     continue
             return j

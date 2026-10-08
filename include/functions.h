@@ -120,6 +120,7 @@ void **func_02006240(struct PtrVec *v, void **pos, u32 tag);   /* erase */
 
 /* ---- timing */
 void *func_020062d0(void);
+void *func_020062e0(void);                    /* game settings */
 u64 func_020822c8(void *timer);
 u64 func_02082290(void *timer, s32 v);
 
