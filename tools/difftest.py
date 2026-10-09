@@ -37,8 +37,9 @@ Memory setup (applied to the starting state of both runs):
                               to TARGET (hex address or $NAME+OFFSET)
   e.g. `$R=ptr:16:4 $O=ptr:0x400:4 @020e36a4:8=1 @020e36c8:32=$R @$R+8:32=$O`
 Options after the arguments: `cases=N` per snapshot (default 300).
-    `stub=ADDR[:VALUE][,...]` makes those functions return at once (with r0 =
-    VALUE, or r0 unchanged) in
+    `stub=ADDR[:VALUE[:OUT]][,...]` makes those functions return at once (with
+    r0 = VALUE, or r0 unchanged; OUT, if given, is stored as a word at the
+    address in r1, for an output argument) in
     both runs, the C copy too if one exists. Only for callees that cannot run
     here (card/file I/O, IPC or save waits, halt; operator delete on a scratch
     buffer), so that the code around them can still be compared.
@@ -270,15 +271,28 @@ class Machine:
         return False
 
     def set_stubs(self, stubs):
-        """stubs: {address: return value or None (r0 unchanged)}"""
+        """stubs: {address: return value or None (r0 unchanged), or a tuple
+        (return value or None, word to store at [r1] or None)}"""
         for h in getattr(self, "stub_hooks", []):
             self.uc.hook_del(h)
         self.stub_values = dict(stubs)
         self.stub_hooks = [self.uc.hook_add(UC_HOOK_CODE, self._stub, begin=a, end=a) for a in stubs]
 
     def _stub(self, uc, addr, size, data):
-        if self.stub_values.get(addr) is not None:
-            uc.reg_write(UC_ARM_REG_R0, self.stub_values[addr] & 0xFFFFFFFF)
+        v = self.stub_values.get(addr)
+        out = None
+        if isinstance(v, tuple):
+            v, out = v
+        if out is not None:
+            dst = uc.reg_read(UC_ARM_REG_R1)
+            try:
+                uc.mem_write(dst, (out & 0xFFFFFFFF).to_bytes(4, "little"))
+                self.dirty.add(dst & ~(self.PAGE - 1))
+                self.dirty.add((dst + 3) & ~(self.PAGE - 1))
+            except Exception:
+                pass
+        if v is not None:
+            uc.reg_write(UC_ARM_REG_R0, v & 0xFFFFFFFF)
         uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR) & ~1)
 
     def _intr(self, uc, intno, data):
@@ -504,7 +518,8 @@ def run_test(machine, func, spec, opts, syms, modes, cand_syms, n, seed):
     stubs = {}
     for x in (opts["stub"].split(",") if "stub" in opts else []):
         a, _, v = x.partition(":")
-        stubs[int(a, 16)] = int(v, 0) if v else None
+        v, _, out = v.partition(":")
+        stubs[int(a, 16)] = (int(v, 0) if v else None, int(out, 0) if out else None)
     # a stubbed function that is itself decompiled is also stubbed in the C build
     by_addr = {a & ~1: n for n, a in syms.items()}
     stubs.update({cand_syms[by_addr[a]]: v for a, v in list(stubs.items()) if by_addr.get(a) in cand_syms})
