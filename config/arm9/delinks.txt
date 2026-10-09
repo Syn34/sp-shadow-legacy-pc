@@ -258,3 +258,11 @@ src/game/TouchPages2.c:
 src/game/StatusMenu.c:
     complete
     .text       start:0x02035afc end:0x020366a4
+
+src/game/LoadMenu.c:
+    complete
+    .text       start:0x020366a4 end:0x02037fc0
+
+src/game/TargetMenu.c:
+    complete
+    .text       start:0x02037fc0 end:0x02038b54
