@@ -238,3 +238,11 @@ src/game/SpellsMenu3.c:
 src/game/CollectionMenu1.c:
     complete
     .text       start:0x02031834 end:0x02032a88
+
+src/game/ItemsMenu1.c:
+    complete
+    .text       start:0x02032a88 end:0x020336b8
+
+src/game/ItemsMenu2.c:
+    complete
+    .text       start:0x020336b8 end:0x020343ac
