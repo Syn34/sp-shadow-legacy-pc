@@ -246,3 +246,15 @@ src/game/ItemsMenu1.c:
 src/game/ItemsMenu2.c:
     complete
     .text       start:0x020336b8 end:0x020343ac
+
+src/game/TouchPages1.c:
+    complete
+    .text       start:0x020343ac end:0x02034d50
+
+src/game/TouchPages2.c:
+    complete
+    .text       start:0x02034d50 end:0x02035afc
+
+src/game/StatusMenu.c:
+    complete
+    .text       start:0x02035afc end:0x020366a4
