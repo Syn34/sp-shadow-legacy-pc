@@ -45,6 +45,8 @@ Options after the arguments: `cases=N` per snapshot (default 300).
     buffer), so that the code around them can still be compared.
     `faultmem=1`: when both versions stop with the same fault, compare memory
     anyway (for code that runs a long way before an unavoidable fault).
+    `noreplay=1`: skip the recorded game calls of this function (for code that
+    copies uninitialised stack data, which differs between the two builds).
 A function may carry several @difftest lines (e.g. RAM and VRAM pointers).
 
 Usage: difftest.py [function-name | src/file.c ...] [--snapshot ram.bin ...] [--cases N] [--max-cases N]
@@ -641,7 +643,10 @@ def main():
                 rets = find_definitions(path)
                 if names:
                     rets = {k: v for k, v in rets.items() if k in names}
+                noreplay = {t[0] for t in ftests if t[3].get("noreplay")}
                 for func in rets:
+                    if func in noreplay:
+                        continue
                     if func in cand_syms and os.path.isdir(os.path.join(cap_dir, func)):
                         ok, n, why = run_replays(func, cand_code, cand_syms, syms, cap_dir, rets[func])
                         replay_total[0] += 1
