@@ -302,3 +302,15 @@ src/game/LanguageMenu.c:
 src/game/Notice.c:
     complete
     .text       start:0x0203ecd4 end:0x0203ef98
+
+src/game/Drops.c:
+    complete
+    .text       start:0x0203ef98 end:0x0203f518
+
+src/game/Chests.c:
+    complete
+    .text       start:0x0203f518 end:0x02040088
+
+src/game/ChestMap.c:
+    complete
+    .text       start:0x02040088 end:0x02040d1c
