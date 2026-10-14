@@ -314,3 +314,11 @@ src/game/Chests.c:
 src/game/ChestMap.c:
     complete
     .text       start:0x02040088 end:0x02040d1c
+
+src/game/StoryPages.c:
+    complete
+    .text       start:0x02040d1c end:0x02041498
+
+src/game/Movables.c:
+    complete
+    .text       start:0x02041498 end:0x0204244c
