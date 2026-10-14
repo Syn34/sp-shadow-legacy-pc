@@ -430,3 +430,19 @@ src/game/Attach.c:
 src/game/BitStream.c:
     complete
     .text       start:0x02051300 end:0x02051634
+
+src/game/Emitter.c:
+    complete
+    .text       start:0x02051634 end:0x02051e08
+
+src/game/EffectData.c:
+    complete
+    .text       start:0x02051e08 end:0x02052c14
+
+src/game/EffectRef.c:
+    complete
+    .text       start:0x02052c14 end:0x02052f10
+
+src/game/ShapeModel.c:
+    complete
+    .text       start:0x02052f10 end:0x02053a94
