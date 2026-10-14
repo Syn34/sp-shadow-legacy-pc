@@ -342,3 +342,11 @@ src/game/Signs.c:
 src/game/SwitchZone.c:
     complete
     .text       start:0x02044594 end:0x02044b44
+
+src/game/Pickup.c:
+    complete
+    .text       start:0x02044b44 end:0x02045900
+
+src/game/PickupSpawn.c:
+    complete
+    .text       start:0x02045900 end:0x02046154
