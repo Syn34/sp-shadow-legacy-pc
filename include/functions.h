@@ -111,7 +111,7 @@ void func_0207fe28(const char *file, s32 line);
 void func_0207fe24(void);
 void func_02080488(void *file, u32 id);       /* open */
 u32 func_02080388(void *file);                /* size */
-void func_02080418(void *dest, u32 size, s32 n, void *file);  /* read */
+s32 func_02080418(void *dest, u32 size, s32 n, void *file);   /* read: how many were read */
 void func_02080458(void *file);               /* close */
 
 /* ---- containers */

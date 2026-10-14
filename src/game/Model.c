@@ -55,7 +55,6 @@ void MI_CpuFill8(void *dest, u8 data, u32 size);
 void MI_Copy64B(const void *src, void *dest);
 void func_02080488(void *file, u32 id);
 u32 func_02080388(void *file);
-void func_02080418(void *dest, u32 size, s32 n, void *file);
 void func_02080458(void *file);
 void *func_0207fe5c(u32 size);
 void func_0207fe2c(void *p);

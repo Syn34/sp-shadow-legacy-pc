@@ -410,3 +410,23 @@ src/game/Model.c:
 src/game/ModelBones.c:
     complete
     .text       start:0x0204fb70 end:0x02050430
+
+src/game/ActorBase.c:
+    complete
+    .text       start:0x02050430 end:0x02050a08
+
+src/game/ActorList.c:
+    complete
+    .text       start:0x02050a08 end:0x02050ed8
+
+src/game/ResSlots.c:
+    complete
+    .text       start:0x02050ed8 end:0x02051068
+
+src/game/Attach.c:
+    complete
+    .text       start:0x02051068 end:0x02051300
+
+src/game/BitStream.c:
+    complete
+    .text       start:0x02051300 end:0x02051634
