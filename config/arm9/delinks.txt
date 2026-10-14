@@ -378,3 +378,19 @@ src/game/AnimFrames.c:
 src/game/Abilities.c:
     complete
     .text       start:0x0204a794 end:0x0204ab18
+
+src/game/TalkSpots.c:
+    complete
+    .text       start:0x0204ab18 end:0x0204b36c
+
+src/game/Scenery.c:
+    complete
+    .text       start:0x0204b36c end:0x0204c148
+
+src/game/Scenery2.c:
+    complete
+    .text       start:0x0204c148 end:0x0204c528
+
+src/game/Bystanders.c:
+    complete
+    .text       start:0x0204c528 end:0x0204cb4c
