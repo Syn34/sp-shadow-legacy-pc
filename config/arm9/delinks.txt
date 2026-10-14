@@ -350,3 +350,7 @@ src/game/Pickup.c:
 src/game/PickupSpawn.c:
     complete
     .text       start:0x02045900 end:0x02046154
+
+src/game/Platforms.c:
+    complete
+    .text       start:0x02046154 end:0x02047780
