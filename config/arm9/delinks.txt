@@ -466,3 +466,23 @@ src/game/Scatter.c:
 src/game/Effects.c:
     complete
     .text       start:0x02054fec end:0x02056288
+
+src/game/ParticleBase.c:
+    complete
+    .text       start:0x02056288 end:0x02057464
+
+src/game/ParticlePresets.c:
+    complete
+    .text       start:0x02057464 end:0x02058900
+
+src/game/ParticleSys.c:
+    complete
+    .text       start:0x02058900 end:0x020590c4
+
+src/game/ResSlots2.c:
+    complete
+    .text       start:0x020590c4 end:0x0205924c
+
+src/game/TaskBase.c:
+    complete
+    .text       start:0x0205924c end:0x020592c8
